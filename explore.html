@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LegacyBrain AI -- Explore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body onload="requireAuth(); initRepoLabel();">
+  <div class="page">
+
+    <div class="topnav">
+      <a href="/dashboard" class="brand"><span class="mark"></span> LEGACYBRAIN AI</a>
+      <div class="navlinks">
+        <a href="/dashboard">Dashboard</a>
+        <a href="/explore" class="active">Explore</a>
+      </div>
+      <div class="navuser">
+        <span id="navUserName">--</span>
+        <button onclick="logout()">Log Out</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <p class="eyebrow">Step 2 of 2</p>
+      <h1 class="pagetitle">Explore the codebase</h1>
+      <p class="pagesub" id="repoLabel">No repository scanned yet -- go to <a href="/dashboard">Dashboard</a> first.</p>
+
+      <div class="tabs-layout">
+        <div class="tabs-nav">
+          <button class="active" onclick="showTab('ask', this)">01 -- Ask</button>
+          <button onclick="showTab('impact', this)">02 -- Impact</button>
+          <button onclick="showTab('docs', this)">03 -- Docs</button>
+          <button onclick="showTab('graph', this)">04 -- Graph</button>
+          <button onclick="showTab('stats', this)">05 -- Stats</button>
+        </div>
+
+        <div class="tabs-content">
+
+          <div class="tab-pane active" id="tab-ask">
+            <div class="panel" data-tag="Natural Language Search">
+              <label for="question">Ask a question about the code</label>
+              <div class="row">
+                <div class="grow"><input type="text" id="question" placeholder="e.g. where is payment calculated" onkeydown="if(event.key==='Enter') doAsk()"></div>
+                <button class="btn" onclick="doAsk()">Ask</button>
+              </div>
+            </div>
+            <pre class="readout" id="askResult"></pre>
+          </div>
+
+          <div class="tab-pane" id="tab-impact">
+            <div class="panel" data-tag="Blast Radius">
+              <label for="impactFile">File to change (relative path)</label>
+              <div class="row">
+                <div class="grow"><input type="text" id="impactFile" placeholder="e.g. src/order_service.py" onkeydown="if(event.key==='Enter') doImpact()"></div>
+                <button class="btn" onclick="doImpact()">Check Impact</button>
+              </div>
+            </div>
+            <pre class="readout" id="impactResult"></pre>
+          </div>
+
+          <div class="tab-pane" id="tab-docs">
+            <div class="panel" data-tag="Auto Documentation">
+              <p class="pagesub" style="margin-bottom:14px;">Generates a Markdown file per source file plus an architecture summary, written into a <code>docs/</code> folder inside the scanned repo.</p>
+              <button class="btn" onclick="doDocs()">Generate Docs</button>
+            </div>
+            <pre class="readout" id="docsResult"></pre>
+          </div>
+
+          <div class="tab-pane" id="tab-graph">
+            <div class="panel" data-tag="Architecture Visualization">
+              <p class="pagesub" style="margin-bottom:14px;">Writes a Mermaid dependency diagram to <code>architecture.md</code> in the scanned repo -- open it in VS Code or GitHub to see it rendered.</p>
+              <button class="btn" onclick="doGraph()">Generate Dependency Graph</button>
+            </div>
+            <pre class="readout" id="graphResult"></pre>
+          </div>
+
+          <div class="tab-pane" id="tab-stats">
+            <div class="panel" data-tag="Modernization Advisor">
+              <button class="btn" onclick="doStats()">Show Architecture Stats</button>
+            </div>
+            <pre class="readout" id="statsResult"></pre>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="titleblock">
+      <span><b>DWG NO.</b> LB-003</span>
+      <span><b>SHEET</b> 3 / 3 -- EXPLORE</span>
+      <span><b>SCALE</b> 1:1</span>
+      <span><b>REV</b> A</span>
+    </div>
+  </div>
+
+<script src="/static/app.js"></script>
+<script>
+function initRepoLabel() {
+  const repo = getRepo();
+  const el = document.getElementById('repoLabel');
+  if (repo) el.innerHTML = 'Working with: <b style="color:var(--cyan)">' + repo + '</b>';
+}
+
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tabs-nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+function setResult(id, text, isError) {
+  const el = document.getElementById(id);
+  el.innerText = text;
+  el.className = 'readout' + (isError ? ' error' : '');
+}
+
+async function doAsk() {
+  const repo = getRepo();
+  const question = document.getElementById('question').value.trim();
+  if (!repo) { setResult('askResult', 'Scan a repository first (Dashboard page).', true); return; }
+  if (!question) return;
+  setResult('askResult', 'Searching...', false);
+  const r = await apiPost('/api/ask', { repo, question });
+  setResult('askResult', r.error ? ('Error: ' + r.error) : r.message, !!r.error);
+}
+
+async function doImpact() {
+  const repo = getRepo();
+  const file = document.getElementById('impactFile').value.trim();
+  if (!repo) { setResult('impactResult', 'Scan a repository first (Dashboard page).', true); return; }
+  if (!file) return;
+  setResult('impactResult', 'Analyzing...', false);
+  const r = await apiPost('/api/impact', { repo, file });
+  setResult('impactResult', r.error ? ('Error: ' + r.error) : r.message, !!r.error);
+}
+
+async function doDocs() {
+  const repo = getRepo();
+  if (!repo) { setResult('docsResult', 'Scan a repository first (Dashboard page).', true); return; }
+  setResult('docsResult', 'Generating...', false);
+  const r = await apiPost('/api/docs', { repo });
+  setResult('docsResult', r.error ? ('Error: ' + r.error) : r.message, !!r.error);
+}
+
+async function doGraph() {
+  const repo = getRepo();
+  if (!repo) { setResult('graphResult', 'Scan a repository first (Dashboard page).', true); return; }
+  setResult('graphResult', 'Generating...', false);
+  const r = await apiPost('/api/graph', { repo });
+  setResult('graphResult', r.error ? ('Error: ' + r.error) : r.message, !!r.error);
+}
+
+async function doStats() {
+  const repo = getRepo();
+  if (!repo) { setResult('statsResult', 'Scan a repository first (Dashboard page).', true); return; }
+  setResult('statsResult', 'Loading...', false);
+  const r = await apiPost('/api/stats', { repo });
+  setResult('statsResult', r.error ? ('Error: ' + r.error) : r.message, !!r.error);
+}
+</script>
+</body>
+</html>

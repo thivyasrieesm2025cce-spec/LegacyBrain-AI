@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LegacyBrain AI -- Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body onload="requireAuth(); restoreRepo();">
+  <div class="page">
+
+    <div class="topnav">
+      <a href="/dashboard" class="brand"><span class="mark"></span> LEGACYBRAIN AI</a>
+      <div class="navlinks">
+        <a href="/dashboard" class="active">Dashboard</a>
+        <a href="/explore">Explore</a>
+      </div>
+      <div class="navuser">
+        <span id="navUserName">--</span>
+        <button onclick="logout()">Log Out</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <p class="eyebrow">Step 1 of 2</p>
+      <h1 class="pagetitle">Scan a repository</h1>
+      <p class="pagesub">Point this at any local folder. LegacyBrain reads every .py / .java / .js / .ts / .go file and builds a searchable model of it -- nothing leaves your machine.</p>
+
+      <div class="panel" data-tag="Repository Input">
+        <label for="repoPath">Folder path</label>
+        <div class="row">
+          <div class="grow"><input type="text" id="repoPath" placeholder="e.g. C:\Users\you\projects\my-old-app"></div>
+          <button class="btn" onclick="doScan()">Scan Repository</button>
+        </div>
+        <div class="status-line" id="scanStatus"></div>
+      </div>
+
+      <div class="panel" data-tag="Readout" id="gaugePanel" style="display:none;">
+        <div class="gauges" id="gauges"></div>
+      </div>
+
+      <div id="nextStepHint" style="display:none;">
+        <p class="pagesub">Scan complete. Head to <a href="/explore">Explore</a> to ask questions, run impact analysis, and generate docs.</p>
+        <button class="btn secondary" onclick="window.location.href='/explore'">Go to Explore &rarr;</button>
+      </div>
+    </div>
+
+    <div class="titleblock">
+      <span><b>DWG NO.</b> LB-002</span>
+      <span><b>SHEET</b> 2 / 3 -- SCAN</span>
+      <span><b>SCALE</b> 1:1</span>
+      <span><b>REV</b> A</span>
+    </div>
+  </div>
+
+<script src="/static/app.js"></script>
+<script>
+function restoreRepo() {
+  const repo = getRepo();
+  if (repo) document.getElementById('repoPath').value = repo;
+}
+
+async function doScan() {
+  const repo = document.getElementById('repoPath').value.trim();
+  const statusEl = document.getElementById('scanStatus');
+  if (!repo) { statusEl.className = 'status-line error'; statusEl.innerText = 'Enter a folder path first.'; return; }
+
+  statusEl.className = 'status-line';
+  statusEl.innerText = 'Scanning...';
+  setRepo(repo);
+
+  const r = await apiPost('/api/scan', { repo });
+  if (r.error) {
+    statusEl.className = 'status-line error';
+    statusEl.innerText = 'Error: ' + r.error;
+    return;
+  }
+  statusEl.innerText = r.message;
+
+  document.getElementById('gaugePanel').style.display = 'block';
+  const g = document.getElementById('gauges');
+  g.innerHTML = '';
+  const stats = [
+    [r.files, 'Files Indexed'],
+    [r.edges, 'Dependency Edges'],
+    [r.languages, 'Languages'],
+  ];
+  stats.forEach(([val, lbl]) => {
+    const div = document.createElement('div');
+    div.className = 'gauge';
+    div.innerHTML = `<div class="val">${val}</div><div class="lbl">${lbl}</div>`;
+    g.appendChild(div);
+  });
+
+  document.getElementById('nextStepHint').style.display = 'block';
+}
+</script>
+</body>
+</html>
